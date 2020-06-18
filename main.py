@@ -147,18 +147,21 @@ class CNN(object):
         # collect params
         self.params = self.__get_params()
 
-        costs = self.__train(x_train, y_train, x_val, y_val, batch_sz, lr, regularization, decay, momentum, epochs)
+        costs, errors = self.__train(x_train, y_train, x_val, y_val, batch_sz, lr, regularization, decay, momentum, epochs)
 
         if show_fig:
             plt.plot(costs)
             plt.show()
 
+            plt.plot(errors)
+            plt.show()
+
     def __train(self, x_train, y_train, x_val, y_val, batch_sz, lr, regularization, decay, momentum, epochs):
-        n_train, width, height, session_cost = x_train.shape
+        n_train, width, height, c = x_train.shape
         y_valid_reserved = np.argmax(y_val, axis=1)
         n_label = len(set(y_valid_reserved))
 
-        tf_x = tf.placeholder(tf.float32, shape=(None, width, height, session_cost), name='X')
+        tf_x = tf.placeholder(tf.float32, shape=(None, width, height, c), name='X')
         tf_y = tf.placeholder(tf.float32, shape=(None, n_label), name='Y')
         activation = self.forward(tf_x)
 
@@ -171,6 +174,7 @@ class CNN(object):
 
         n_batches = n_train // batch_sz
         costs = []
+        errors = []
 
         init = tf.global_variables_initializer()
 
@@ -185,15 +189,17 @@ class CNN(object):
                     session.run(train_optimizer, feed_dict={tf_x: x_batch, tf_y: y_batch})
 
                     if batch % 20 == 0:
-                        session_cost = session.run(cost, feed_dict={tf_x: x_val, tf_y: y_val})
-                        costs.append(session_cost)
+                        c = session.run(cost, feed_dict={tf_x: x_val, tf_y: y_val})
+                        costs.append(c)
 
                         session_prediction = session.run(prediction, feed_dict={tf_x: x_val, tf_y: y_val})
-                        error = error_rate(y_valid_reserved, session_prediction)
-                        self.error_rate = error if self.error_rate is None else min(self.error_rate, error)
-                        print("epoch:", epoch, "batch:", batch, "cost:", session_cost, "error rate:", error)
 
-        return costs
+                        error = error_rate(y_valid_reserved, session_prediction)
+                        errors.append(error)
+                        self.error_rate = error if self.error_rate is None else min(self.error_rate, error)
+                        print("epoch:", epoch, "batch:", batch, "cost:", c, "error rate:", error)
+
+        return costs, errors
 
     def __create_hidden_layers(self, hidden_size):
         hidden_layers = []
